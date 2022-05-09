@@ -1,8 +1,7 @@
 /**
- * @file mm.c
- * @brief A 64-bit struct-based implicit free list memory allocator
+ * 
+ * A 64-bit struct-based implicit free list memory allocator
  *
- * 15-213: Introduction to Computer Systems
  *
  * This dynamic memory allocator uses multiple arenas.
  * 
@@ -20,10 +19,6 @@
 #include <pthread.h>
 
 #include <sys/mman.h> // for mmap()
-
-// /#define dbg_printf dbg_dbg_printf
-
-/* You can change anything from here onward */
 
 /*
  *****************************************************************************
@@ -72,17 +67,8 @@ static const size_t min_block_size = 2 * dsize;
 // 2048B, divisible by 16
 // when heap is full, extend heap by this much
 
-/**
- * TODO: explain what size_mask is
- */
+
 static const word_t size_mask = ~(word_t)0xF;
-
-// typedef struct listNode {
-//     block_t block;
-//     struct listNode *next;
-
-// } listNode_t;
-// LIFO
 
 /* Global variables */
 
@@ -196,10 +182,6 @@ static void *header_to_payload(block_t *block) {
  * @return A pointer to the block's footer
  */
 static word_t *header_to_footer(block_t *block) {
-    // printf("block %p\n", block);
-    // printf("header %lx\n", block->header);
-    // printf("footer %lx\n", *(word_t *)(block->payload + get_size(block) -
-    // dsize));
     return (word_t *)(block->payload + get_size(block) - dsize);
 }
 
@@ -383,8 +365,6 @@ static block_t *find_prev(block_t *block) { // dont call on first
  */
 static void add_to_free_list(block_t *block, arena_t *arena) {
     block_t **seglists = arena->seglists;
-
-    // IN AFRICA, THAT IS SOOO BAAADDD
     size_t list_ind = find_list_for_block(block);
     if (seglists[list_ind] == block)
         return;
@@ -457,13 +437,7 @@ static void delete_from_free_list(block_t *block, arena_t *arena) {
 static block_t *coalesce_block(block_t *block, arena_t *arena) {
     dbg_assert(block != NULL);
     dbg_assert(!get_alloc(block));
-    /*
-     * TODO: delete or replace this comment once you've thought about it.
-     * Think about how coalesce_block should be implemented, it would be helpful
-     * to review the lecture Dynamic Memory Allocation: Advanced. Consider the
-     * four cases that you reviewed when writing your traces, how will you
-     * account for all of these?
-     */
+
     block_t *next = find_next(block);
     bool prevAlloc = get_prev_alloc(block);
     bool nextAlloc = get_alloc(next);
@@ -827,7 +801,6 @@ static void *_calloc(size_t elements, size_t size) {
 
 
 /* thread safe wrappers with global lock.
- * naive version.
  */
 void *arena_malloc(size_t size) {
     /* find an arena to use, and establish ownership of it. */

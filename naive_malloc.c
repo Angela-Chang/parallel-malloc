@@ -1,8 +1,5 @@
 /**
- * @file mm.c
- * @brief A 64-bit struct-based implicit free list memory allocator
- *
- * 15-213: Introduction to Computer Systems
+ * A 64-bit struct-based implicit free list memory allocator
  *
  * Naive malloc implementation, using one global lock
  * on the entire heap.
@@ -22,7 +19,6 @@
 #include <unistd.h>
 #include <pthread.h>
 
-/* Do not change the following! */
 
 #ifdef DRIVER
 /* create aliases for driver tests */
@@ -34,20 +30,8 @@
 #define memcpy mem_memcpy
 #endif /* def DRIVER */
 
-// /#define dbg_printf dbg_dbg_printf
 
-/* You can change anything from here onward */
 
-/*
- *****************************************************************************
- * If DEBUG is defined (such as when running mdriver-dbg), these macros      *
- * are enabled. You can use them to print debugging output and to check      *
- * contracts only in debug mode.                                             *
- *                                                                           *
- * Only debugging macros with names beginning "dbg_" are allowed.            *
- * You may not define any other macros having arguments.                     *
- *****************************************************************************
- */
 #ifdef DEBUG
 /* When DEBUG is defined, these form aliases to useful functions */
 #define dbg_printf(...) printf(__VA_ARGS__)
@@ -78,41 +62,30 @@ static bool mm_checkheap(int x) { return true; }
 
 typedef uint64_t word_t;
 
-/** @brief Word and header size (bytes) */
+/** Word and header size (bytes) */
 static const size_t wsize = sizeof(word_t);
 // 8B
 
-/** @brief Double word size (bytes) */
+/** Double word size (bytes) */
 static const size_t dsize = 2 * wsize;
 // 16B
 
-/** @brief Minimum block size (bytes) */
+/** Minimum block size (bytes) */
 static const size_t min_block_size = 2 * dsize;
 // 32B
 
 /**
- * TODO: explain what chunksize is
- * (Must be divisible by dsize)
+ * (chunksize must be divisible by dsize)
  */
 static const size_t chunksize = (1 << 12);
 // 2048B, divisible by 16
 // when heap is full, extend heap by this much
 
-/**
- * TODO: explain what size_mask is
- */
 static const word_t size_mask = ~(word_t)0xF;
-
-// typedef struct listNode {
-//     block_t block;
-//     struct listNode *next;
-
-// } listNode_t;
-// LIFO
 
 /* Global variables */
 
-/** @brief Pointer to first block in the heap */
+/** Pointer to first block in the heap */
 static block_t *heap_start = NULL;
 static void *heap_end = NULL;
 
@@ -133,31 +106,17 @@ static void *mem_heap_hi(void) {
     return (void *)((char *)heap_end - 1);
 }
 
-/*
- *****************************************************************************
- * The functions below are short wrapper functions to perform                *
- * bit manipulation, pointer arithmetic, and other helper operations.        *
- *                                                                           *
- * We've given you the function header comments for the functions below      *
- * to help you understand how this baseline code works.                      *
- *                                                                           *
- * Note that these function header comments are short since the functions    *
- * they are describing are short as well; you will need to provide           *
- * adequate details within your header comments for the functions above!     *
- *****************************************************************************
- */
 
 /*
  * ---------------------------------------------------------------------------
  *                        BEGIN SHORT HELPER FUNCTIONS
  * ---------------------------------------------------------------------------
  */
-// void print_freelist();
 /**
- * @brief Returns the maximum of two integers.
- * @param[in] x
- * @param[in] y
- * @return `x` if `x > y`, and `y` otherwise.
+ * Returns the maximum of two integers.
+ * input x
+ * input y
+ * return `x` if `x > y`, and `y` otherwise.
  */
 static size_t max(size_t x, size_t y) {
     return (x > y) ? x : y;
@@ -168,10 +127,10 @@ static size_t min(size_t x, size_t y) {
 }
 
 /**
- * @brief Rounds `size` up to next multiple of n
- * @param[in] size
- * @param[in] n
- * @return The size after rounding up
+ * Rounds `size` up to next multiple of n
+ * input size
+ * input n
+ * return The size after rounding up
  */
 static size_t round_up(size_t size, size_t n) {
     if (size <= n)
@@ -183,44 +142,40 @@ static size_t round_up(size_t size, size_t n) {
 bool naive_malloc_init(void) { return true; }
 
 /**
- * @brief Given a payload pointer, returns a pointer to the corresponding
+ * Given a payload pointer, returns a pointer to the corresponding
  *        block.
- * @param[in] bp A pointer to a block's payload
- * @return The corresponding block
+ * input bp A pointer to a block's payload
+ * return The corresponding block
  */
 static block_t *payload_to_header(void *bp) {
     return (block_t *)((char *)bp - offsetof(block_t, payload));
 }
 
 /**
- * @brief Given a block pointer, returns a pointer to the corresponding
+ * Given a block pointer, returns a pointer to the corresponding
  *        payload.
- * @param[in] block
- * @return A pointer to the block's payload
+ * input block
+ * return A pointer to the block's payload
  */
 static void *header_to_payload(block_t *block) {
     return (void *)(block->payload);
 }
 
 /**
- * @brief Given a block pointer, returns a pointer to the corresponding
+ * Given a block pointer, returns a pointer to the corresponding
  *        footer.
- * @param[in] block
- * @return A pointer to the block's footer
+ * input block
+ * return A pointer to the block's footer
  */
 static word_t *header_to_footer(block_t *block) {
-    // printf("block %p\n", block);
-    // printf("header %lx\n", block->header);
-    // printf("footer %lx\n", *(word_t *)(block->payload + get_size(block) -
-    // dsize));
     return (word_t *)(block->payload + get_size(block) - dsize);
 }
 
 /**
- * @brief Given a block footer, returns a pointer to the corresponding
+ * Given a block footer, returns a pointer to the corresponding
  *        header.
- * @param[in] footer A pointer to the block's footer
- * @return A pointer to the start of the block
+ * input footer A pointer to the block's footer
+ * return A pointer to the start of the block
  */
 
 static bool get_alloc(block_t *block);
@@ -232,13 +187,13 @@ static block_t *footer_to_header(word_t *footer) {
 }
 
 /**
- * @brief Returns the payload size of a given block.
+ * Returns the payload size of a given block.
  *
  * The payload size is equal to the entire block size minus the sizes of the
  * block's header and footer.
  *
- * @param[in] block
- * @return The size of the block's payload
+ * input block
+ * return The size of the block's payload
  */
 static size_t get_payload_size(block_t *block) {
     size_t asize = get_size(block);
@@ -246,52 +201,52 @@ static size_t get_payload_size(block_t *block) {
 }
 
 /**
- * @brief Returns the allocation status of a given header value.
+ * Returns the allocation status of a given header value.
  *
  * This is based on the lowest bit of the header value.
  *
- * @param[in] word
- * @return The allocation status correpsonding to the word
+ * input word
+ * return The allocation status correpsonding to the word
  */
 static bool extract_alloc(word_t word) {
     return (bool)(word & alloc_mask);
 }
 
 /**
- * @brief Returns the allocation status of a block, based on its header.
- * @param[in] block
- * @return The allocation status of the block
+ * Returns the allocation status of a block, based on its header.
+ * input block
+ * return The allocation status of the block
  */
 static bool get_alloc(block_t *block) {
     return extract_alloc(block->header);
 }
 /**
- * @brief Returns the previous block's allocation status of a given header
+ * Returns the previous block's allocation status of a given header
  * value.
  *
  * This is based on the second lowest bit of the header value.
  *
- * @param[in] word
- * @return The previous block's allocation status correpsonding to the word
+ * input word
+ * return The previous block's allocation status correpsonding to the word
  */
 static bool extract_prev_alloc(word_t word) {
     return (bool)(word & prev_alloc_mask);
 }
 /**
- * @brief Returns the allocation status of the previous block, based on its
+ * Returns the allocation status of the previous block, based on its
  * header.
- * @param[in] block
- * @return The allocation status of the previous block
+ * input block
+ * return The allocation status of the previous block
  */
 static bool get_prev_alloc(block_t *block) {
     return extract_prev_alloc(block->header);
 }
 /**
- * @brief Writes an epilogue header at the given address.
+ * Writes an epilogue header at the given address.
  *
  * The epilogue header has size 0, and is marked as allocated.
  *
- * @param[out] block The location to write the epilogue header
+ * output: block The location to write the epilogue header
  */
 static void write_epilogue(block_t *block, bool prev_alloc) {
     dbg_requires(block != NULL);
@@ -299,17 +254,14 @@ static void write_epilogue(block_t *block, bool prev_alloc) {
 }
 
 /**
- * @brief Writes a block starting at the given address.
+ * Writes a block starting at the given address.
  *
  * This function writes both a header and footer, where the location of the
  * footer is computed in relation to the header.
  *
- * TODO: Are there any preconditions or postconditions?
- * Written as contracts
- *
- * @param[out] block The location to begin writing the block header
- * @param[in] size The size of the new block
- * @param[in] alloc The allocation status of the new block
+ * output block The location to begin writing the block header
+ * input size The size of the new block
+ * input alloc The allocation status of the new block
  */
 static void write_block(block_t *block, size_t size, bool alloc,
                         bool prev_alloc) {
@@ -331,14 +283,14 @@ static void write_block(block_t *block, size_t size, bool alloc,
 }
 
 /**
- * @brief Finds the next consecutive block on the heap.
+ * Finds the next consecutive block on the heap.
  *
  * This function accesses the next block in the "implicit list" of the heap
  * by adding the size of the block.
  *
- * @param[in] block A block in the heap
- * @return The next consecutive block on the heap
- * @pre The block is not the epilogue
+ * input block A block in the heap
+ * return The next consecutive block on the heap
+ * requires that The block is not the epilogue
  */
 static block_t *find_next(block_t *block) {
     dbg_requires(block != NULL);
@@ -347,8 +299,8 @@ static block_t *find_next(block_t *block) {
 }
 
 /**
- * @brief Finds the footer of the previous block on the heap.
- * @param[in] block A block in the heap
+ * Finds the footer of the previous block on the heap.
+ * input block A block in the heap
  * @return The location of the previous block's footer
  */
 static word_t *find_prev_footer(block_t *block) {
@@ -357,7 +309,7 @@ static word_t *find_prev_footer(block_t *block) {
 }
 
 /**
- * @brief Finds the previous consecutive block on the heap.
+ * Finds the previous consecutive block on the heap.
  *
  * This is the previous block in the "implicit list" of the heap.
  *
@@ -365,9 +317,9 @@ static word_t *find_prev_footer(block_t *block) {
  * block's footer to determine its size, then calculating the start of the
  * previous block based on its size.
  *
- * @param[in] block A block in the heap
- * @return The previous consecutive block in the heap
- * @pre The block is not the first block in the heap
+ * input block A block in the heap
+ * return The previous consecutive block in the heap
+ * requires that The block is not the first block in the heap
  */
 static block_t *find_prev(block_t *block) { // dont call on first
     dbg_requires(block != NULL);
@@ -386,8 +338,8 @@ static block_t *find_prev(block_t *block) { // dont call on first
 /******** The remaining content below are helper and debug routines ********/
 
 /**
- * @brief Adds a block to explicit seglist
- * @param[in] block A block in the heap
+ * Adds a block to explicit seglist
+ * input block A block in the heap
  */
 static void add_to_free_list(block_t *block) {
 
@@ -452,26 +404,19 @@ static void delete_from_free_list(block_t *block) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> join free blocks together
  * <What are the function's arguments?> ptr to block being freed
  * <What is the function's return value?> ptr to block
  * <Are there any preconditions or postconditions?> ptr not null, block is free
  *
- * @param[in] block
- * @return
+ * input block
  */
 static block_t *coalesce_block(block_t *block) {
     dbg_assert(block != NULL);
     dbg_assert(!get_alloc(block));
-    /*
-     * TODO: delete or replace this comment once you've thought about it.
-     * Think about how coalesce_block should be implemented, it would be helpful
-     * to review the lecture Dynamic Memory Allocation: Advanced. Consider the
-     * four cases that you reviewed when writing your traces, how will you
-     * account for all of these?
-     */
+
     block_t *next = find_next(block);
     bool prevAlloc = get_prev_alloc(block);
     bool nextAlloc = get_alloc(next);
@@ -547,19 +492,18 @@ static block_t *extend_heap(size_t size, bool prev_alloc) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> Splits a block into 2 to malloc the first part
  * <What are the function's arguments?>
  * <What is the function's return value?>
  * <Are there any preconditions or postconditions?>
  *
- * @param[in] block
- * @param[in] asize
+ * input block
+ * input asize
  */
 static void split_block(block_t *block, size_t asize) {
     dbg_requires(get_alloc(block));
-    /* TODO: Can you write a precondition about the value of asize? */
     dbg_requires(asize > 0);
 
     size_t block_size = get_size(block);
@@ -575,14 +519,14 @@ static void split_block(block_t *block, size_t asize) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> Finds the list for this block's size
  * <What are the function's arguments?> ptr to block
  * <What is the function's return value?> index of the list it should go to
  * <Are there any preconditions or postconditions?> See contracts
  *
- * @param[in] asize
+ * input asize
  * @return list_ind
  */
 static size_t find_list_for_block(block_t *block) {
@@ -600,15 +544,15 @@ static size_t find_list_for_block(block_t *block) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> Looks for a fit in a seglist
  * <What are the function's arguments?> ptr to start of list, size needed
  * <What is the function's return value?> a block of decent fit
  * <Are there any preconditions or postconditions?> See contracts
  *
- * @param[in] asize, list_start
- * @return a block or NULL
+ * input asize, list_start
+ * return a block or NULL
  */
 static block_t *search_list(block_t *list_start, size_t asize) {
     dbg_requires(asize > 0);
@@ -653,15 +597,15 @@ static block_t *search_list(block_t *list_start, size_t asize) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> Finds a block given a size
  * <What are the function's arguments?> size required
  * <What is the function's return value?> pointer of good block
  * <Are there any preconditions or postconditions?> See contracts
  *
- * @param[in] asize
- * @return block or NULL
+ * input asize
+ * return block or NULL
  */
 static block_t *find_fit(size_t asize) {
     dbg_requires(asize > 0);
@@ -692,14 +636,14 @@ static block_t *find_fit(size_t asize) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> Initialise the lists and the heap
  * <What are the function's arguments?> void
  * <What is the function's return value?> true if sucessful, false if not
  * <Are there any preconditions or postconditions?> NA
  *
- * @return boolean
+ * return boolean
  */
 bool mm_init(void) {
     pthread_mutex_init(&global_lock, NULL);
@@ -731,15 +675,15 @@ bool mm_init(void) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> Allocates a block of correct size
  * <What are the function's arguments?> size
  * <What is the function's return value?> ptr to right block
  * <Are there any preconditions or postconditions?> See contracts
  *
- * @param[in] size
- * @return bp or NULL
+ * input size
+ * return bp or NULL
  */
 static void *_malloc(size_t size) {
     dbg_requires(size > 0);
@@ -796,14 +740,14 @@ static void *_malloc(size_t size) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> Frees a block
  * <What are the function's arguments?> ptr to block
  * <What is the function's return value?> void
  * <Are there any preconditions or postconditions?> See contracts
  *
- * @param[in] bp
+ * input bp
  */
 static void _free(void *bp) {
     dbg_requires(bp);
@@ -833,16 +777,16 @@ static void _free(void *bp) {
 }
 
 /**
- * @brief
+ *
  *
  * <What does this function do?> Malloc but all bits set to 0
  * <What are the function's arguments?> number of elements and size of an
  * element <What is the function's return value?> ptr to block <Are there any
  * preconditions or postconditions?> See contracts
  *
- * @param[in] elements
- * @param[in] size
- * @return bp
+ * input elements
+ * input size
+ * return bp
  */
 static void *_calloc(size_t elements, size_t size) {
     dbg_requires(elements > 0 && size > 0);

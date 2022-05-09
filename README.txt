@@ -1,4 +1,4 @@
-Compile instructions:
+Compile instructions (this will build the test binary).
 
 gcc -pthread -D [MODE] -D NUMTHREADS=[n] *.c
 
