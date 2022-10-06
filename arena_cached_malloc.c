@@ -683,9 +683,6 @@ static void *_malloc(size_t size, arena_t *arena) {
     block_t *next = find_next(block);
     write_block(next, get_size(next), get_alloc(next), true);
     bp = header_to_payload(block);
-
-    // what is your clan?
-    // what tribe are you?
     return bp;
 }
 
